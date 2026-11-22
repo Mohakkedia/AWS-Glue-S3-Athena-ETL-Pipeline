@@ -1,0 +1,53 @@
+{
+  "Comment": "Orchestrates the billing-claims Glue ETL job, polls until it finishes, then invokes a Lambda to notify on completion (success or failure).",
+  "StartAt": "StartGlueJob",
+  "States": {
+    "StartGlueJob": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::glue:startJobRun.sync",
+      "Parameters": {
+        "JobName": "billing-claims-etl",
+        "Arguments": {
+          "--RAW_S3_PATH": "s3://${bucket_name}/raw/claims/",
+          "--CURATED_S3_PATH": "s3://${bucket_name}/curated/claims/",
+          "--GLUE_DATABASE": "billing_analytics"
+        }
+      },
+      "Comment": "The .sync suffix makes this a SYNCHRONOUS task token integration — Step Functions waits for the Glue job to actually finish (success or failure) rather than just confirming it started, so this single state replaces a hand-rolled poll loop.",
+      "Next": "NotifyCompletion",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.error",
+          "Next": "NotifyFailure"
+        }
+      ]
+    },
+    "NotifyCompletion": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "notify-pipeline-completion",
+        "Payload": {
+          "JobRun.$": "$"
+        }
+      },
+      "End": true
+    },
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "notify-pipeline-completion",
+        "Payload": {
+          "JobRun": {
+            "JobName": "billing-claims-etl",
+            "JobRunState": "FAILED"
+          },
+          "Error.$": "$.error"
+        }
+      },
+      "End": true
+    }
+  }
+}

@@ -1,0 +1,49 @@
+[
+  {
+    "step": "upload_raw_to_s3",
+    "timestamp": "2026-09-21T01:39:55.948408+00:00",
+    "bucket": "billing-etl-demo-bucket",
+    "key": "raw/claims/raw_claims.csv"
+  },
+  {
+    "step": "glue_etl_transform",
+    "timestamp": "2026-09-21T01:39:55.977269+00:00",
+    "rows_in": 202,
+    "rows_out": 200,
+    "rows_dropped": 2,
+    "partitions": [
+      "2026-08",
+      "2026-09"
+    ]
+  },
+  {
+    "step": "register_glue_catalog",
+    "timestamp": "2026-09-21T01:39:56.099743+00:00",
+    "database": "billing_analytics",
+    "tables": [
+      "claims_curated"
+    ]
+  },
+  {
+    "step": "athena_equivalent_query",
+    "timestamp": "2026-09-21T01:39:56.113218+00:00",
+    "sql": "SELECT payer_code,\n               COUNT(*) AS n_claims,\n               ROUND(SUM(billed_amount), 2) AS total_billed,\n               ROUND(SUM(outstanding_amount), 2) AS total_outstanding\n        FROM read_parquet('/home/claude/cloud-platform-portfolio/07-aws-glue-athena-etl/local_demo/outputs/curated_parquet/**/*.parquet', hive_partitioning=1)\n        GROUP BY payer_code\n        ORDER BY total_outstanding DESC",
+    "n_result_rows": 4
+  },
+  {
+    "step": "lambda_notify_completion",
+    "timestamp": "2026-09-21T01:39:56.135172+00:00",
+    "result": {
+      "statusCode": 200,
+      "body": {
+        "job_name": "billing-claims-etl",
+        "run_id": "jr_local_demo_001",
+        "state": "SUCCEEDED",
+        "started_on": "2026-09-21T01:39:55.948408+00:00",
+        "completed_on": "2026-09-21T01:39:56.115708+00:00",
+        "notified_at": "2026-09-21T01:39:56.115723+00:00",
+        "marker_location": "s3://billing-etl-demo-bucket/pipeline-status/billing-claims-etl/jr_local_demo_001.json"
+      }
+    }
+  }
+]
